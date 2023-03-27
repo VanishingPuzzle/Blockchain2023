@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // example oracle from chainlink we can use floor prices for mock up
+// https://docs.chain.link/any-api/get-request/examples/single-word-response/ or something like this that returns constants for the mockup
 pragma solidity ^0.8.7;
 
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
