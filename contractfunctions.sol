@@ -19,7 +19,7 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     uint256 public IR = 1;
     uint256 public discount = 9;
     uint256 public contractValue;
-
+    address public immutable nftContract = 0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8; //This should be set by the constructor to the NFT contract
 //Events
     event Loan(address indexed _borrower, uint256 _TokenID, uint256 _borrowAmount);
     event Repayment(address indexed _borrower, uint256 _TokenID, uint256 _pendingLoan);
@@ -33,7 +33,11 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
         _mint(to, amount);
     }
-    
+
+     function onERC721Received(address, address, uint256, bytes memory) public virtual returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
+
     function updateLoanBalance(address _borrower, uint256 _tokenID, uint256 _pendingLoan) internal {
         borrowAccounts[_borrower][_tokenID] = _pendingLoan;
     }
@@ -50,6 +54,10 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     }
     function checkLoan(address _borrower, uint256 _tokenID) public view returns (uint256) {
         return borrowAccounts[_borrower][_tokenID];
+    }
+    function transferNFT(uint256 _tokenID) private {
+        // Call the safeTransferFrom function of the ERC721 contract
+        IERC721(nftContract).safeTransferFrom(msg.sender, address(this), _tokenID);
     }
 
 // Deposit and withdraw function for liquidity providers
@@ -84,10 +92,10 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
      _price = fetchPrice(_tokenID); //function must be defined previously
       
 //controls the borrowed amount
-      require(_borrowAmount <= BC / 10 * _price, "Amount to borrow is over the capacity");
+      require(_borrowAmount <= ((BC * _price)/ 10 ), "Amount to borrow is over the capacity");
 
 //TransfersNFTs and ETH
-      transferFrom(msg.sender, address(this), _tokenID); //Should use safe transfer from
+      transferNFT(_tokenID);
       transferETHToSender(_borrowAmount);
 //updates the balances
      updateLoanBalance(_borrower, _tokenID, _borrowAmount);
@@ -148,5 +156,4 @@ emit Repayment(_borrower, _tokenID, _pendingLoan);
   }
 
 }
-
 
