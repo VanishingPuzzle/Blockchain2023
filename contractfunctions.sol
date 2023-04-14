@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
 //Global variables
     mapping(address => mapping(uint256 => uint256)) public borrowAccounts;
@@ -20,6 +21,7 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     uint256 public discount = 9;
     uint256 public contractValue;
     address public immutable nftContract = 0xf8e81D47203A594245E36C48e151709F0C19fBe8; //This should be set by the constructor to the NFT contract
+    uint256 public price = 100;
 
 //Events
     event Loan(address indexed _borrower, uint256 _TokenID, uint256 _borrowAmount);
@@ -29,7 +31,32 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     constructor() ERC20("LENDCoin", "LND") ERC20Permit("LANDmarket") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, address(this)); // minter role probably has to be the contract address and not msg.sender
+        _grantRole(ADMIN_ROLE, msg.sender);
     }
+
+//Parameter controls I still think these should be set by the owners of mool and not msg.sender
+    function setBC(uint256 _BC) public onlyRole(ADMIN_ROLE) {
+       BC = _BC;
+    }
+    function setLT(uint256 _LT) public onlyRole(ADMIN_ROLE) {
+       LT = _LT;
+    }
+    function setIR(uint256 _IR) public onlyRole(ADMIN_ROLE) {
+       IR = _IR;
+    }
+    function setDiscount(uint256 _discount) public onlyRole(ADMIN_ROLE) {
+       discount = _discount;
+    }
+    function setPrice(uint256 _price) public onlyRole(ADMIN_ROLE) {
+       price = _price;
+    }
+   function setAdmin(address _newAdmin) public {
+        require(hasRole(ADMIN_ROLE, msg.sender), "Must have admin role");
+        require(_newAdmin != address(0), "New admin cannot be zero address");
+        revokeRole(ADMIN_ROLE, msg.sender);
+        _setupRole(ADMIN_ROLE, _newAdmin);
+    }
+
 //Basic functions
     function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
         _mint(to, amount);
@@ -50,8 +77,8 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     function transferETHToSender(uint256 amount) internal {
         transferEth(payable(msg.sender), amount);
     }
-    function fetchPrice(uint256 _tokenID) internal returns (uint256 price) {
-        price = 100;
+    function fetchPrice(uint256 _tokenID) internal returns (uint256 _price) {
+        _price = price;
     }
     function checkLoan(address _borrower, uint256 _tokenID) public view returns (uint256) {
         return borrowAccounts[_borrower][_tokenID];
@@ -146,8 +173,7 @@ emit Repayment(_borrower, _tokenID, _pendingLoan);
 //Check current loan and current price
     _pendingAmount = checkLoan(_borrower,_tokenID); 
       //Calculates current price of NFT
-    //_price = fetchPrice(_tokenID); //function must be defined previously
-    _price = 40;
+    _price = fetchPrice(_tokenID); //function must be defined previously
     _liquidationValue = (_price * LT)/10 * 1000000000000000000;
 //Controls that the NFT can be liquidated
     require(_pendingAmount >= _liquidationValue, "The position is not unhealthy");
