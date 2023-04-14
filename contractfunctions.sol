@@ -19,11 +19,12 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     uint256 public IR = 1;
     uint256 public discount = 9;
     uint256 public contractValue;
-    address public immutable nftContract = 0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8; //This should be set by the constructor to the NFT contract
+    address public immutable nftContract = 0xf8e81D47203A594245E36C48e151709F0C19fBe8; //This should be set by the constructor to the NFT contract
+
 //Events
     event Loan(address indexed _borrower, uint256 _TokenID, uint256 _borrowAmount);
     event Repayment(address indexed _borrower, uint256 _TokenID, uint256 _pendingLoan);
-    event Liquidation(address _borrower, uint256 _tokenID);
+    event Liquidation(address indexed _borrower, uint256 _tokenID);
 
     constructor() ERC20("LENDCoin", "LND") ERC20Permit("LANDmarket") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -55,9 +56,13 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     function checkLoan(address _borrower, uint256 _tokenID) public view returns (uint256) {
         return borrowAccounts[_borrower][_tokenID];
     }
-    function transferNFT(uint256 _tokenID) private {
+    function transferINNFT(uint256 _tokenID) private {
         // Call the safeTransferFrom function of the ERC721 contract
         IERC721(nftContract).safeTransferFrom(msg.sender, address(this), _tokenID);
+    }
+    function transferOUTNFT(address _target, uint256 _tokenID) private {
+        // Call the safeTransferFrom function of the ERC721 contract
+        IERC721(nftContract).safeTransferFrom(address(this), _target, _tokenID);
     }
 
 // Deposit and withdraw function for liquidity providers
@@ -76,26 +81,28 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
         contractValue += msg.value;
     }
 }
-    function withdraw(uint256 amount) external {
-    require(balanceOf(msg.sender) >= amount, "Insufficient balance");
-    uint256 proportionalValue = (amount * contractValue) / totalSupply();
+    function withdraw(uint256 _amount) external {
+    require(address(this).balance >= _amount, "The contract does not have the required liquidity");
+    require(balanceOf(msg.sender) >= _amount, "Insufficient balance");
+    uint256 proportionalValue = (_amount * contractValue) / totalSupply();
     contractValue -= proportionalValue;
-    _burn(msg.sender, amount);
+    _burn(msg.sender, _amount);
     payable(msg.sender).transfer(proportionalValue);
 }
 
 //Borrow function for NFT Holders
   function borrowLiquidity(uint256 _tokenID, uint256 _borrowAmount) public returns(bool success) {
+      require(address(this).balance >= _borrowAmount, "The contract does not have the required liquidity");
       address _borrower = msg.sender;
       uint256 _price;
       //Calculates price of NFT
      _price = fetchPrice(_tokenID); //function must be defined previously
       
 //controls the borrowed amount
-      require(_borrowAmount <= ((BC * _price)/ 10 ), "Amount to borrow is over the capacity");
+      require((_borrowAmount / 1000000000000000000) <= ((BC * _price)/ 10 ), "Amount to borrow is over the capacity");
 
 //TransfersNFTs and ETH
-      transferNFT(_tokenID);
+      transferINNFT(_tokenID);
       transferETHToSender(_borrowAmount);
 //updates the balances
      updateLoanBalance(_borrower, _tokenID, _borrowAmount);
@@ -119,7 +126,7 @@ if (msg.value < _pendingAmount) {
 } else {
     _return = msg.value - _pendingAmount;
     transferETHToSender(_return);
-    transferFrom(address(this), _borrower, _tokenID);
+    transferOUTNFT(_borrower, _tokenID);
     updateLoanBalance(_borrower, _tokenID, 0);
     _pendingLoan = 0;
 }
@@ -138,22 +145,23 @@ emit Repayment(_borrower, _tokenID, _pendingLoan);
     require(msg.value > 0, "No ETH has been payed");
 //Check current loan and current price
     _pendingAmount = checkLoan(_borrower,_tokenID); 
-      //Calculates price of NFT
-    _price = fetchPrice(_tokenID); //function must be defined previously
-    _liquidationValue = _price * LT/10;
+      //Calculates current price of NFT
+    //_price = fetchPrice(_tokenID); //function must be defined previously
+    _price = 40;
+    _liquidationValue = (_price * LT)/10 * 1000000000000000000;
 //Controls that the NFT can be liquidated
     require(_pendingAmount >= _liquidationValue, "The position is not unhealthy");
 //Controls that enough ETH was deposited to buy the NFT
-    _discountedPrice = _price * discount/10;
+    _discountedPrice = (_price * discount)/10 * 1000000000000000000;
     require(msg.value >= _discountedPrice, "Not enough ETH has been deposited to buy the LAND parcel");
 //transfer and settles loan liquidation
     _return = msg.value - _discountedPrice;
     transferETHToSender(_return);
-    transferFrom(address(this), msg.sender, _tokenID);
+    transferOUTNFT(msg.sender, _tokenID);
     updateLoanBalance(_borrower, _tokenID, 0);
+    contractValue = contractValue + (_discountedPrice - _pendingAmount);
 //emit event
     emit Liquidation(_borrower, _tokenID);
   }
 
 }
-
