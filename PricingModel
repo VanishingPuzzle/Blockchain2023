@@ -1,0 +1,83 @@
+import pandas as pd
+
+# Load the data
+data = pd.read_csv('../data/processed_decentraland.csv')
+
+# Define the features (characteristics) and the target (price)
+features = ['size', 'distance_center', 'distance_road', 'distance_plaza', 'distance_district']
+target = 'price'
+
+# Define the weights and baskets for each feature
+weights = {
+    'size': 0.3,
+    'distance_center': 0.2,
+    'distance_road': 0.2,
+    'distance_plaza': 0.1,
+    'distance_district': 0.2
+}
+
+baskets = {
+    'low': (0, 25),
+    'medium': (25, 50),
+    'high': (50, 75),
+    'very_high': (75, 100)
+}
+
+# Define the scoring function for each feature
+def score_size(x):
+    if x < 500:
+        return 0
+    elif x < 1000:
+        return 25
+    elif x < 2000:
+        return 50
+    else:
+        return 100
+
+def score_distance(x):
+    if x < 0.5:
+        return 100
+    elif x < 1:
+        return 75
+    elif x < 2:
+        return 50
+    else:
+        return 25
+
+# Apply the scoring function to each feature
+data['score_size'] = data['size'].apply(score_size)
+data['score_distance_center'] = data['distance_center'].apply(score_distance)
+data['score_distance_road'] = data['distance_road'].apply(score_distance)
+data['score_distance_plaza'] = data['distance_plaza'].apply(score_distance)
+data['score_distance_district'] = data['distance_district'].apply(score_distance)
+
+# Calculate the weighted score for each feature
+for feature in features:
+    data[f'weighted_score_{feature}'] = data[f'score_{feature}'] * weights[feature]
+
+# Calculate the total score for each NFT LAND parcel
+data['total_score'] = data[[f'weighted_score_{feature}' for feature in features]].sum(axis=1)
+
+# Assign each NFT LAND parcel to a basket based on the total score
+for basket, (lower_bound, upper_bound) in baskets.items():
+    data.loc[(data['total_score'] >= lower_bound) & (data['total_score'] < upper_bound), 'basket'] = basket
+
+# Calculate the floor price for each NFT LAND parcel in each basket
+for basket in baskets:
+    lower_bound, upper_bound = baskets[basket]
+    data.loc[data['basket'] == basket, 'floor_price'] = (data.loc[data['basket'] == basket, 'total_score'] *
+                                                         (lower_bound + upper_bound) / 2 * 1000)
+
+# Display the floor price for a new NFT LAND parcel
+new_parcel = {'size': 1000, 'distance_center': 2, 'distance_road': 0.5, 'distance_plaza': 1, 'distance_district': 3}
+scores = [score_size(new_parcel['size']),
+          score_distance(new_parcel['distance_center']),
+          score_distance(new_parcel['distance_road']),
+          score_distance(new_parcel['distance_plaza']),
+          score_distance(new_parcel['distance_district'])]
+total_score = sum([score * weight for score, weight in zip(scores, weights.values())])
+for basket, (lower_bound, upper_bound) in baskets.items():
+    if lower_bound <= total_score < upper_bound:
+        floor_price = total_score * (lower_bound + upper_bound) / 2 * 1000
+        print(f"The floor price for the new NFT LAND parcel is: {floor_price:.2f} ETH in the {basket} basket.")
+        break
