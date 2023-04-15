@@ -1,12 +1,12 @@
 //"SPDX license identifier: MIT"
 pragma solidity ^0.8.9;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";  
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";  // Since SC is the owner, hence <mintable and burnable
+import "@openzeppelin/contracts/access/AccessControl.sol"; // Admin
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";  // so that it can hold NFTs
 //import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
@@ -19,7 +19,7 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     uint256 public LT = 6;
     uint256 public IR = 1;
     uint256 public discount = 9;
-    uint256 public contractValue;
+    uint256 public contractValue; //keep track of ETH(theoritical)
     address public immutable nftContract = 0xf8e81D47203A594245E36C48e151709F0C19fBe8; //This should be set by the constructor to the NFT contract
     uint256 public price = 100;
 
@@ -67,7 +67,7 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     }
 
     function updateLoanBalance(address _borrower, uint256 _tokenID, uint256 _pendingLoan) internal {
-        borrowAccounts[_borrower][_tokenID] = _pendingLoan;
+        borrowAccounts[_borrower][_tokenID] = _pendingLoan; // uses mapping, gives address to token ID and changes load amount based on deposit
     }
     function transferEth(address payable recipient, uint256 amount) internal {
         require(address(this).balance >= amount, "Insufficient contract balance");
@@ -78,7 +78,7 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
         transferEth(payable(msg.sender), amount);
     }
     function fetchPrice(uint256 _tokenID) internal returns (uint256 _price) {
-        _price = price;
+        _price = price; //should communicate with external API
     }
     function checkLoan(address _borrower, uint256 _tokenID) public view returns (uint256) {
         return borrowAccounts[_borrower][_tokenID];
@@ -98,10 +98,10 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     require(msg.value > 0, "Must deposit some Ether");
     if (totalSupply() == 0) {
         // Mint an initial supply of tokens to the depositor
-        uint256 initialSupply = 10;
+        uint256 initialSupply = 10; //originally its should be 10^18 to avoid rounding errors
         _mint(msg.sender, initialSupply);
         // Set the contract value to the initial deposit
-        contractValue = msg.value;
+        contractValue = msg.value; //theoritical value
     } else {
         uint256 share = (msg.value * totalSupply()) / contractValue;
         _mint(msg.sender, share);
@@ -118,12 +118,12 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
 }
 
 //Borrow function for NFT Holders
-  function borrowLiquidity(uint256 _tokenID, uint256 _borrowAmount) public returns(bool success) {
+  function borrowLiquidity(uint256 _tokenID, uint256 _borrowAmount) external returns(bool success) {
       require(address(this).balance >= _borrowAmount, "The contract does not have the required liquidity");
       address _borrower = msg.sender;
       uint256 _price;
       //Calculates price of NFT
-     _price = fetchPrice(_tokenID); //function must be defined previously
+     _price = fetchPrice(_tokenID); //function must be defined previously communicates with external API
       
 //controls the borrowed amount
       require((_borrowAmount / 1000000000000000000) <= ((BC * _price)/ 10 ), "Amount to borrow is over the capacity");
@@ -145,7 +145,7 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
 //Check that ETH has been paid  
       require(msg.value > 0, "No ETH has been payed");
 //Check current loan
-      _pendingAmount = checkLoan(_borrower,_tokenID);
+      _pendingAmount = checkLoan(_borrower,_tokenID); //Need to implement interest
 //Updates values or transfer settles loan
 if (msg.value < _pendingAmount) {
     _pendingLoan = _pendingAmount - msg.value;
