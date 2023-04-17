@@ -1,4 +1,4 @@
-//"SPDX license identifier: MIT"
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol"; //Allows the creation of our ERC20 Token
@@ -38,23 +38,23 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     }
 
 //Parameter controls I still think these should be set by the owners of pool and not msg.sender
-    function setBC(uint256 _BC) public onlyRole(ADMIN_ROLE) {
+    function setBC(uint256 _BC) external onlyRole(ADMIN_ROLE) {
        BC = _BC;
     }
-    function setLT(uint256 _LT) public onlyRole(ADMIN_ROLE) {
+    function setLT(uint256 _LT) external onlyRole(ADMIN_ROLE) {
        LT = _LT;
     }
-    function setIR(uint256 _IR) public onlyRole(ADMIN_ROLE) {
+    function setIR(uint256 _IR) external onlyRole(ADMIN_ROLE) {
        IR = _IR;
     }
-    function setDiscount(uint256 _discount) public onlyRole(ADMIN_ROLE) {
+    function setDiscount(uint256 _discount) external onlyRole(ADMIN_ROLE) {
        discount = _discount;
     }
-    function setPrice(uint256 _price) public onlyRole(ADMIN_ROLE) {
+    function setPrice(uint256 _price) external onlyRole(ADMIN_ROLE) {
        price = _price;
     }
     //Changes Admin Role
-    function setAdmin(address _newAdmin) public { 
+    function setAdmin(address _newAdmin) external { 
         require(hasRole(ADMIN_ROLE, msg.sender), "Must have admin role");
         require(_newAdmin != address(0), "New admin cannot be zero address");
         revokeRole(ADMIN_ROLE, msg.sender);
@@ -62,7 +62,7 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     }
 
 //Basic functions
-    function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
+    function mint(address to, uint256 amount) internal onlyRole(MINTER_ROLE) {
         _mint(to, amount);
     }
     //Necessary for implementation
@@ -86,7 +86,7 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
         transferEth(payable(msg.sender), amount);
     }
     //Function that comunicates with external API and gets Price according to basket, here is a constant for testing
-    function fetchPrice(uint256 _tokenID) internal returns (uint256 _price) { //Unused parameter is theoretical, it would take the ID and pass it to model API
+    function fetchPrice(uint256 _tokenID) internal view returns (uint256 _price) { //Unused parameter is theoretical, it would take the ID and pass it to model API
         _price = price;
     }
     //Calls the stored value of a specific loan
@@ -98,29 +98,25 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
         return loanTime[_borrower][_tokenID];
     }
     // We use this function to move in the NFT, it needs to be approved
-    function transferINNFT(uint256 _tokenID) private {
+    function transferINNFT(uint256 _tokenID) internal {
         // Call the safeTransferFrom function of the ERC721 contract
         IERC721(nftContract).safeTransferFrom(msg.sender, address(this), _tokenID);
     }
     // This we use in repayments or liquidations
-    function transferOUTNFT(address _target, uint256 _tokenID) private {
+    function transferOUTNFT(address _target, uint256 _tokenID) internal {
         // Call the safeTransferFrom function of the ERC721 contract
         IERC721(nftContract).safeTransferFrom(address(this), _target, _tokenID);
     }
     //Calculates accrued interest
-    function calculateAccruedInterest(uint256 _loanValue, uint256 _loanTime, uint256 _IR) public view returns (uint256) {
+    function calculateAccruedInterest(uint256 _loanValue, uint256 _loanTime, uint256 _IR) internal view returns (uint256) {
     // Convert APR to a fixed-point decimal value with 18 decimal places
         uint256 decimalApr = _IR * 10**18 / 100;
-    
     // Calculate the time difference in seconds
         uint256 timeDiff = block.timestamp - _loanTime;
-    
     // Calculate the interest rate per second as a fixed-point decimal value
         uint256 interestRatePerSecond = decimalApr / 31536000; // 31536000 is the number of seconds in a year
-    
     // Calculate the accrued interest as a fixed-point decimal value
         uint256 accruedInterest = _loanValue * interestRatePerSecond * timeDiff / 10**18;
-    
         return accruedInterest;
 }
 
@@ -150,7 +146,7 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
 }
 
 //Borrow function for NFT Holders
-  function borrowLiquidity(uint256 _tokenID, uint256 _borrowAmount) public returns(bool success) {
+  function borrowLiquidity(uint256 _tokenID, uint256 _borrowAmount) external {
       require(address(this).balance >= _borrowAmount, "The contract does not have the required liquidity");
       address _borrower = msg.sender;
       uint256 _price;
@@ -170,7 +166,7 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
   }
 
 //Pay loans function for NFT holders
-  function payLoan(address _borrower, uint256 _tokenID) external payable returns (bool success) {
+  function payLoan(address _borrower, uint256 _tokenID) external payable {
       uint256 _loanValue;
       uint256 _pendingAmount;
       uint256 _accruedInterest;
@@ -204,7 +200,7 @@ emit Repayment(_borrower, _tokenID, _pendingLoan);
   }
 
 //Liquidation function
-  function liquidate(address _borrower, uint256 _tokenID) external payable returns (bool success) {
+  function liquidate(address _borrower, uint256 _tokenID) external payable {
     uint256 _loanValue;
     uint256 _loanTime;
     uint256 _pendingAmount;
