@@ -302,13 +302,29 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
     LendCoin1.transferFrom(msg.sender, address(this), _amount);
     LendCoin1.burn(_amount); //Burns returned tokens
     payable(msg.sender).transfer(proportionalValue); //Transfers ETH
-    } else {
+    } else if (_poolNumber == 2) {
     require(LendCoin2.balanceOf(msg.sender) >= _amount, "Insufficient balance"); //Checks msg.sender has sufficient ERC20 tokens
     uint256 proportionalValue = (_amount * contractValue2) / LendCoin2.totalSupply(); //Calculate proportion of pool 
     contractValue2 -= proportionalValue; //Updates contract value
     require(address(this).balance >= proportionalValue, "The contract does not have the required liquidity"); //In case of loses or too much borrowing
     LendCoin2.transferFrom(msg.sender, address(this), _amount);
     LendCoin2.burn(_amount); //Burns returned tokens
+    payable(msg.sender).transfer(proportionalValue); //Transfers ETH
+    } else if (_poolNumber == 3) {
+    require(LendCoin3.balanceOf(msg.sender) >= _amount, "Insufficient balance"); //Checks msg.sender has sufficient ERC20 tokens
+    uint256 proportionalValue = (_amount * contractValue3) / LendCoin3.totalSupply(); //Calculate proportion of pool 
+    contractValue3 -= proportionalValue; //Updates contract value
+    require(address(this).balance >= proportionalValue, "The contract does not have the required liquidity"); //In case of loses or too much borrowing
+    LendCoin3.transferFrom(msg.sender, address(this), _amount);
+    LendCoin3.burn(_amount); //Burns returned tokens
+    payable(msg.sender).transfer(proportionalValue); //Transfers ETH
+    } else {
+    require(LendCoin4.balanceOf(msg.sender) >= _amount, "Insufficient balance"); //Checks msg.sender has sufficient ERC20 tokens
+    uint256 proportionalValue = (_amount * contractValue4) / LendCoin4.totalSupply(); //Calculate proportion of pool 
+    contractValue4 -= proportionalValue; //Updates contract value
+    require(address(this).balance >= proportionalValue, "The contract does not have the required liquidity"); //In case of loses or too much borrowing
+    LendCoin4.transferFrom(msg.sender, address(this), _amount);
+    LendCoin4.burn(_amount); //Burns returned tokens
     payable(msg.sender).transfer(proportionalValue); //Transfers ETH
     }
 }
