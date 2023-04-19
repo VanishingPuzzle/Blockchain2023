@@ -261,7 +261,7 @@ and the address of the NFT token to accept */
         } else if (_poolNumber == 2){ 
             if (LendCoin2.totalSupply() == 0) {
             // Mint an initial supply of tokens to the depositor
-            uint256 initialSupply = 10;
+            uint256 initialSupply = 10;//should be 10e 18 to avoid rounding errors
             LendCoin2.mint(msg.sender, initialSupply);
             // Set the contract value to the initial deposit
             contractValue2 = msg.value;
@@ -276,7 +276,7 @@ and the address of the NFT token to accept */
             uint256 initialSupply = 10;
             LendCoin3.mint(msg.sender, initialSupply);
             // Set the contract value to the initial deposit
-            contractValue2 = msg.value;
+            contractValue3 = msg.value;
             } else {
                 uint256 share = (msg.value * LendCoin3.totalSupply()) / contractValue3; //Proportionally mints ERC20 tokens
                 LendCoin3.mint(msg.sender, share);
