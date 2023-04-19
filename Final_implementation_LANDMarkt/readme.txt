@@ -1,3 +1,5 @@
+This is the final implementation using 1 POOL, for the 4 pool guide check our repo.
+
 This is the LAND_MARKT contract deployment guide
 
 LAND_MARKT is a contract that allows you to deposit NFTs and borrow ETH from a pool using them as collateral.
