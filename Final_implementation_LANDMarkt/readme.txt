@@ -1,4 +1,4 @@
-This is the final implementation using 1 POOL, for the 4 pool guide check our repo.
+This is the final implementation using 1 POOL, for the 4 pool guide check our repo. The 4 pool implementation has additional functionalities. The one pool implementation is useful for testing, it does not implement an interest model.
 
 This is the LAND_MARKT contract deployment guide
 
