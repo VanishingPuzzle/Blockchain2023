@@ -376,7 +376,7 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
       uint256 _BC;
       uint256 _IR;
       uint256 _basket;
-      uint256 _loanValue;
+      uint256 _loanValue; //result of checkloan
       uint256 _loanTime;
       uint256 _pendingAmount;
       uint256 _accruedInterest;
@@ -393,15 +393,19 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
      if (_basket == 1) {
             _IR = IR1;
             _contractValue = contractValue1;
+            _BC = BC1;
         } else if (_basket == 2) {
             _IR = IR2;
             _contractValue = contractValue2;
+            _BC = BC2;
         } else if (_basket == 3) {
             _IR = IR3;
             _contractValue = contractValue3;
+            _BC = BC3;
         } else {
             _IR = IR4;
             _contractValue = contractValue4;
+            _BC = BC4;
         }  
     //Calculates accrued interest
       _accruedInterest = calculateAccruedInterest(_loanValue, _loanTime, _IR);
@@ -417,13 +421,13 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
      updateLoanTime(_borrower, _tokenID);
     //update contract value
      if (_contractValue == contractValue1) {
-            contractValue1 = contractValue1 + _newBalance;
+            contractValue1 = contractValue1 + _accruedInterest;
          } else if (_contractValue == contractValue2) {
-            contractValue2 = contractValue2 + _newBalance;
+            contractValue2 = contractValue2 + _accruedInterest;
          } else if (_contractValue == contractValue3) {
-            contractValue3 = contractValue3 + _newBalance;
+            contractValue3 = contractValue3 + _accruedInterest;
          } else {
-            contractValue4 = contractValue4 + _newBalance;
+            contractValue4 = contractValue4 + _accruedInterest;
          } 
     //emits Event
       emit Loan(_borrower, _tokenID, _borrowAmount);
@@ -432,11 +436,11 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
     //Pay loans function for NFT holders
   function payLoan(address _borrower, uint256 _tokenID) external payable {
       //Variables for calculations
-      uint256 _loanValue;
-      uint256 _pendingAmount;
+      uint256 _loanValue; //result of checkloan
+      uint256 _pendingAmount; //loan+interest
       uint256 _accruedInterest;
-      uint256 _pendingLoan;
-      uint256 _return;
+      uint256 _pendingLoan; //after payment value
+      uint256 _return; //any extra ETH sent is returned
       uint256 _loanTime;
       uint256 _basket;
       uint256 _IR;
@@ -504,17 +508,17 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
     //Liquidation function
   function liquidate(address _borrower, uint256 _tokenID) external payable {
     //loan characteristics
-    uint256 _loanValue;
+    uint256 _loanValue; //result of checkloan
     uint256 _loanTime;
     uint256 _IR;
     uint256 _LT;
     uint256 _discount;
     uint256 _price;
     //calculations
-    uint256 _pendingAmount;
-    uint256 _return;
-    uint256 _discountedPrice;
-    uint256 _liquidationValue;
+    uint256 _pendingAmount; //value + interest
+    uint256 _return; // any extra ETH sent is returned
+    uint256 _discountedPrice; 
+    uint256 _liquidationValue; // price * LT 
     uint256 _accruedInterest;
     uint256 _contractValue;
     //Check that ETH has been paid  
