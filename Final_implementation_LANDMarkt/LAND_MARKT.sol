@@ -15,31 +15,23 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
 //Global variables
     mapping(address => mapping(uint256 => uint256)) public borrowAccounts; //Track loan accounts
     mapping(address => mapping(uint256 => uint256)) public loanTime; // keeps track of the loan timestamps
-    uint256 public BC1 = 3; //Here as integers but they are divided by 10 in the functions
-    uint256 public BC2 = 3;
-    uint256 public BC3 = 3;
-    uint256 public BC4 = 3;
-    uint256 public LT1 = 6;
-    uint256 public LT2 = 6;
-    uint256 public LT3 = 6;
-    uint256 public LT4 = 6;
-    uint256 public IR1 = 10; //This one is in percentage
-    uint256 public IR2 = 10;
-    uint256 public IR3 = 10;
-    uint256 public IR4 = 10;
-    uint256 public discount1 = 9;
-    uint256 public discount2 = 9;
-    uint256 public discount3 = 9;
-    uint256 public discount4 = 9;
+    mapping(address => mapping(uint256 => uint256)) public loanIR; // keeps track of a loan interest
+    uint256 public BC = 3; //Here as integers but they are divided by 10 in the functions
+    uint256 public LT = 6;
+    //uint256 public IR = 10; //This one is in percentage
+    //Variable interest rate parameters, They are in basis points to facilitate calculations
+    uint256 slope1 = 1000;
+    uint256 slope2 = 6000;
+    uint256 BI = 500; // base interest
+    uint256 Uopt = 9000;
+    uint256 public totalLoans;
+    uint256 public discount = 9;
     uint256 public contractValue; //Keeps tracks of the contract pending loans and balance values
     address public immutable nftContract; //Should be set by the constructor to the NFT contract
     //The following are just for the mockup and testing
     mapping(uint256 => uint256) public basketMapping;
     //For testing in theory is sent by API
-    uint256 public price1 = 100;
-    uint256 public price2 = 100;
-    uint256 public price3 = 100;
-    uint256 public price4 = 100;
+    uint256 public price = 3;
 
 //Events necessary for the contract
     event Loan(address indexed _borrower, uint256 _TokenID, uint256 _borrowAmount);
@@ -55,65 +47,20 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     }
 
 //Parameter controls I still think these should be set by the governor of pool and not msg.sender
-    function setBC(uint256 _BC, uint256 _basket) external onlyRole(ADMIN_ROLE) {
-        require(_basket == 1 || _basket == 2 || _basket == 3 || _basket == 4, "Basket must be 1, 2, 3, or 4");
-        if (_basket == 1) {
-            BC1 = _BC;
-        } else if (_basket == 2) {
-            BC2 = _BC;
-        } else if (_basket == 3) {
-            BC3 = _BC;
-        } else {
-            BC4 = _BC;
+    function setBC(uint256 _BC) external onlyRole(ADMIN_ROLE) {
+            BC = _BC;
         }
+    function setLT(uint256 _LT) external onlyRole(ADMIN_ROLE) {
+            LT = _LT;
     }
-    function setLT(uint256 _LT, uint256 _basket) external onlyRole(ADMIN_ROLE) {
-        require(_basket == 1 || _basket == 2 || _basket == 3 || _basket == 4, "Basket must be 1, 2, 3, or 4");
-        if (_basket == 1) {
-            LT1 = _LT;
-        } else if (_basket == 2) {
-            LT2 = _LT;
-        } else if (_basket == 3) {
-            LT3 = _LT;
-        } else {
-            LT4 = _LT;
-        }
+    //function setIR(uint256 _IR) external onlyRole(ADMIN_ROLE) {
+    //        IR = _IR;
+    //}
+    function setdiscount(uint256 _discount) external onlyRole(ADMIN_ROLE) {
+            discount = _discount;
     }
-    function setIR(uint256 _IR, uint256 _basket) external onlyRole(ADMIN_ROLE) {
-        require(_basket == 1 || _basket == 2 || _basket == 3 || _basket == 4, "Basket must be 1, 2, 3, or 4");
-        if (_basket == 1) {
-            IR1 = _IR;
-        } else if (_basket == 2) {
-            IR2 = _IR;
-        } else if (_basket == 3) {
-            IR3 = _IR;
-        } else {
-            IR4 = _IR;
-        }
-    }
-    function setdiscount(uint256 _discount, uint256 _basket) external onlyRole(ADMIN_ROLE) {
-        require(_basket == 1 || _basket == 2 || _basket == 3 || _basket == 4, "Basket must be 1, 2, 3, or 4");
-        if (_basket == 1) {
-            discount1 = _discount;
-        } else if (_basket == 2) {
-            discount2 = _discount;
-        } else if (_basket == 3) {
-            discount3 = _discount;
-        } else {
-            discount4 = _discount;
-        }
-    }
-    function setPrice(uint256 _price, uint256 _basket) external onlyRole(ADMIN_ROLE) {
-        require(_basket == 1 || _basket == 2 || _basket == 3 || _basket == 4, "Basket must be 1, 2, 3, or 4");
-        if (_basket == 1) {
-            price1 = _price;
-        } else if (_basket == 2) {
-            price2 = _price;
-        } else if (_basket == 3) {
-            price3 = _price;
-        } else {
-            price4 = _price;
-        }
+    function setPrice(uint256 _price) external {
+            price = _price;
     }
     //Changes Admin Role
     function setAdmin(address _newAdmin) external { 
@@ -138,6 +85,11 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     function updateLoanTime(address _borrower, uint256 _tokenID) internal {
         loanTime[_borrower][_tokenID] = block.timestamp;
     }
+    //UpdatesIR
+    function updateLoanIR(address _borrower, uint256 _tokenID) internal {
+        uint256 _IR = setIR(); 
+        loanIR[_borrower][_tokenID] = _IR;
+    }
     //We use these to send refunds
     function transferEth(address payable recipient, uint256 amount) internal {
         require(address(this).balance >= amount, "Insufficient contract balance");
@@ -148,24 +100,21 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
         transferEth(payable(msg.sender), amount);
     }
     //Function that comunicates with external API and gets Price according to basket, here is a constant for testing
-    function fetchPrice(uint256 _tokenID) public returns (uint256 _price) { //Unused parameter is theoretical, it would take the ID and pass it to model API
-        uint256 _basket;
-        if (basketMapping[_tokenID] == 0) {
-            _basket = uint256(keccak256(abi.encodePacked(block.timestamp))) % 4 + 1;
-            basketMapping[_tokenID] = _basket;
-        } else {
-            _basket = basketMapping[_tokenID];
-        }
-        if (_basket == 1) {
-            _price = price1;
-        } else if (_basket == 2) {
-            _price = price2;
-        } else if (_basket == 3) {
-            _price = price3;
-        } else {
-            _price = price4;
-        }  
+    function fetchPrice(uint256 _tokenID) public view returns (uint256 _price) { //Unused parameter is theoretical, it would take the ID and pass it to model API
+            _price = price;
     }
+    //Variable rate model function
+    function setIR() internal view returns(uint256) {
+        uint256 _IR;
+            uint256 _utilizationRate = (totalLoans * 10000) / contractValue; // calculates utilization
+            //if under Uopt slope1 else slope 2
+            if (_utilizationRate <= Uopt) {
+                _IR = BI + ((_utilizationRate * slope1) / Uopt);
+            } else {
+                _IR = BI + slope1 + (((_utilizationRate - Uopt) * slope2) / (10000 - Uopt));
+            }
+            return _IR;
+    }   
     
     //Calls the stored value of a specific loan
     function checkLoan(address _borrower, uint256 _tokenID) public view returns (uint256) {
@@ -174,6 +123,10 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     //Used to check starting times for interest rate calculations
     function checkTime(address _borrower, uint256 _tokenID) public view returns (uint256) {
         return loanTime[_borrower][_tokenID];
+    }
+    //Checks IR
+     function checkIR(address _borrower, uint256 _tokenID) public view returns (uint256) {
+        return loanIR[_borrower][_tokenID];
     }
     // We use this function to move in the NFT, it needs to be approved
     function transferINNFT(uint256 _tokenID) internal {
@@ -188,7 +141,7 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     //Calculates accrued interest
     function calculateAccruedInterest(uint256 _loanValue, uint256 _loanTime, uint256 _IR) internal view returns (uint256) {
     // Convert APR to a fixed-point decimal value with 18 decimal places
-        uint256 decimalApr = _IR * 10**18 / 100;
+        uint256 decimalApr = _IR * 10**18 / 10000;
     // Calculate the time difference in seconds
         uint256 timeDiff = block.timestamp - _loanTime;
     // Calculate the interest rate per second as a fixed-point decimal value
@@ -196,10 +149,9 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     // Calculate the accrued interest as a fixed-point decimal value
         uint256 accruedInterest = _loanValue * interestRatePerSecond * timeDiff / 10**18;
         return accruedInterest;
-}
+    }   
 
 // Deposit and withdraw function for liquidity providers
-    
     function deposit() external payable {
     require(msg.value > 0, "Must deposit some Ether"); // checks that ETH was payed
     if (totalSupply() == 0) {
@@ -215,9 +167,9 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     }
 }
     function withdraw(uint256 _amount) external {
-    require(address(this).balance >= _amount, "The contract does not have the required liquidity"); //In case of loses or too much borrowing
     require(balanceOf(msg.sender) >= _amount, "Insufficient balance"); //Checks msg.sender has sufficient ERC20 tokens
     uint256 proportionalValue = (_amount * contractValue) / totalSupply(); //Calculate proportion of pool 
+     require(address(this).balance >= proportionalValue, "The contract does not have the required liquidity"); //In case of loses or too much borrowing
     contractValue -= proportionalValue; //Updates contract value
     _burn(msg.sender, _amount); //Burns returned tokens
     payable(msg.sender).transfer(proportionalValue); //Transfers ETH
@@ -228,21 +180,9 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
       require(address(this).balance >= _borrowAmount, "The contract does not have the required liquidity");
       address _borrower = msg.sender;
       uint256 _price;
-      uint256 _BC;
-      uint256 _basket;
+      uint256 _BC = BC;
       //Calculates price of NFT
      _price = fetchPrice(_tokenID); //function must be defined previously
-     _basket = basketMapping[_tokenID];
-     if (_basket == 1) {
-            _BC = BC1;
-        } else if (_basket == 2) {
-            _BC = BC2;
-        } else if (_basket == 3) {
-            _BC = BC3;
-        } else {
-            _BC = BC4;
-        }  
-
 //controls the borrowed amount
       require((_borrowAmount / 1000000000000000000) <= ((_BC * _price)/ 10 ), "Amount to borrow is over the capacity");
 //TransfersNFTs and ETH
@@ -250,8 +190,12 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
       transferETHToSender(_borrowAmount);
 //updates the balances
      updateLoanBalance(_borrower, _tokenID, _borrowAmount);
+     //Updates IR
+     updateLoanIR(_borrower, _tokenID);
 //sets loan time
      updateLoanTime(_borrower, _tokenID);
+//Updates loan
+     totalLoans = totalLoans + _borrowAmount;
 //emits Event
       emit Loan(_borrower, _tokenID, _borrowAmount);
   }
@@ -261,9 +205,8 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
       require(_borrower == msg.sender, "Only the owner of the loan can ask for more liquidity");
       require(address(this).balance >= _borrowAmount, "The contract does not have the required liquidity");
       uint256 _price;
-      uint256 _BC;
+      uint256 _BC = BC;
       uint256 _IR;
-      uint256 _basket;
       uint256 _loanValue;
       uint256 _loanTime;
       uint256 _pendingAmount;
@@ -275,16 +218,6 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
      //Check current loan
       _loanValue = checkLoan(_borrower,_tokenID);
       _loanTime = checkTime(_borrower,_tokenID);
-      _basket = basketMapping[_tokenID];
-     if (_basket == 1) {
-            _IR = IR1;
-        } else if (_basket == 2) {
-            _IR = IR2;
-        } else if (_basket == 3) {
-            _IR = IR3;
-        } else {
-            _IR = IR4;
-        }  
 //Calculates accrued interest
       _accruedInterest = calculateAccruedInterest(_loanValue, _loanTime, _IR);
       _pendingAmount = _loanValue + _accruedInterest;
@@ -297,8 +230,12 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
      updateLoanBalance(_borrower, _tokenID, _newBalance);
 //sets loan time
      updateLoanTime(_borrower, _tokenID);
+     //updates IR
+     updateLoanIR(_borrower, _tokenID);
 //update contract value
      contractValue = contractValue + _accruedInterest;
+     //Updates loans value
+     totalLoans = totalLoans + _borrowAmount + _accruedInterest;
 //emits Event
       emit Loan(_borrower, _tokenID, _borrowAmount);
   }
@@ -311,23 +248,13 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
       uint256 _pendingLoan;
       uint256 _return;
       uint256 _loanTime;
-      uint256 _basket;
       uint256 _IR;
 //Check that ETH has been paid  
       require(msg.value > 0, "No ETH has been payed");
 //Check current loan
       _loanValue = checkLoan(_borrower,_tokenID);
       _loanTime = checkTime(_borrower,_tokenID);
-      _basket = basketMapping[_tokenID];
-     if (_basket == 1) {
-            _IR = IR1;
-        } else if (_basket == 2) {
-            _IR = IR2;
-        } else if (_basket == 3) {
-            _IR = IR3;
-        } else {
-            _IR = IR4;
-        }  
+      _IR = checkIR(_borrower,_tokenID);
 //Calculates accrued interest
       _accruedInterest = calculateAccruedInterest(_loanValue, _loanTime, _IR);
       _pendingAmount = _loanValue + _accruedInterest;
@@ -336,15 +263,17 @@ if (msg.value < _pendingAmount) {
     _pendingLoan = _pendingAmount - msg.value;
     updateLoanBalance(_borrower, _tokenID, _pendingLoan);
     updateLoanTime(_borrower, _tokenID);
+    contractValue = contractValue + _accruedInterest;
+    totalLoans = totalLoans - msg.value + _accruedInterest;
 } else {
     _return = msg.value - _pendingAmount;
     transferETHToSender(_return);
     transferOUTNFT(_borrower, _tokenID);
     updateLoanBalance(_borrower, _tokenID, 0);
     _pendingLoan = 0;
+    contractValue = contractValue + _accruedInterest;
+        totalLoans = totalLoans - _loanValue;
 }
-//Update contract value
-contractValue = contractValue + _accruedInterest;
 //emit event
 emit Repayment(_borrower, _tokenID, _pendingLoan);
   }
@@ -354,16 +283,14 @@ emit Repayment(_borrower, _tokenID, _pendingLoan);
     //loan characteristics
     uint256 _loanValue;
     uint256 _loanTime;
-    uint256 _basket;
     uint256 _IR;
-    uint256 _LT;
-    uint256 _discount;
+    uint256 _LT = LT;
+    uint256 _discount = discount;
     uint256 _price;
     //calculations
     uint256 _pendingAmount;
     uint256 _return;
     uint256 _discountedPrice;
-    uint256 _discountedPriceInWei;
     uint256 _liquidationValue;
     uint256 _accruedInterest;
     
@@ -372,25 +299,8 @@ emit Repayment(_borrower, _tokenID, _pendingLoan);
 //Check current loan
       _loanValue = checkLoan(_borrower,_tokenID);
       _loanTime = checkTime(_borrower,_tokenID);
+      _IR = checkIR(_borrower,_tokenID);
       _price = fetchPrice(_tokenID);
-      _basket = basketMapping[_tokenID];
-     if (_basket == 1) {
-            _IR = IR1;
-            _LT = LT1;
-            _discount = discount1;
-        } else if (_basket == 2) {
-            _IR = IR2;
-            _LT = LT2;
-            _discount = discount2;
-        } else if (_basket == 3) {
-            _IR = IR3;
-            _LT = LT3;
-            _discount = discount3;
-        } else {
-            _IR = IR4;
-            _LT = LT4;
-            _discount = discount4;
-        }  
 //Calculates accrued interest
      _accruedInterest = calculateAccruedInterest(_loanValue, _loanTime, _IR);
      _pendingAmount = _loanValue + _accruedInterest;
@@ -398,16 +308,15 @@ emit Repayment(_borrower, _tokenID, _pendingLoan);
 //Controls that the NFT can be liquidated
     require(_pendingAmount >= _liquidationValue, "The position is not unhealthy");
 //Controls that enough ETH was deposited to buy the NFT
-    _discountedPrice = (_price * _discount) / 10;  
-        // Convert the discounted price to Wei
-    _discountedPriceInWei = _discountedPrice * 1 ether;
-    require(msg.value >= _discountedPriceInWei, "Not enough ETH has been deposited to buy the LAND parcel");
+    _discountedPrice = ((_price * _discount) * 1 ether) / 10;  
+    require(msg.value >= _discountedPrice, "Not enough ETH has been deposited to buy the LAND parcel");
 //transfer and settles loan liquidation
-    _return = msg.value - _discountedPriceInWei;
+    _return = msg.value - _discountedPrice;
     transferETHToSender(_return);
     transferOUTNFT(msg.sender, _tokenID);
     updateLoanBalance(_borrower, _tokenID, 0);
-    contractValue = contractValue + _discountedPriceInWei - _loanValue;
+    contractValue = contractValue + _discountedPrice - _loanValue;
+    totalLoans = totalLoans - _loanValue;
     //emit event
     emit Liquidation(_borrower, _tokenID);
   }
