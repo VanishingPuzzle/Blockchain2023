@@ -25,6 +25,7 @@ contract LANDmarket is AccessControl {
 //Global variables
     mapping(address => mapping(uint256 => uint256)) public borrowAccounts; //Track loan accounts
     mapping(address => mapping(uint256 => uint256)) public loanTime; // keeps track of the loan timestamps
+    mapping(address => mapping(uint256 => uint256)) public loanIR; // keeps track of a loan interest
     // These are the loan policy conditions, can be set by Governor role (ADMIN)
     uint256 public BC1 = 3; //Here as integers but they are divided by 10 in the functions
     uint256 public BC2 = 3;
@@ -38,10 +39,25 @@ contract LANDmarket is AccessControl {
     uint256 public discount2 = 9;
     uint256 public discount3 = 9;
     uint256 public discount4 = 9;
-    uint256 public IR1 = 10; //This one is in percentage
+    /*uint256 public IR1 = 10; //This one is in percentage
     uint256 public IR2 = 10;
     uint256 public IR3 = 10;
-    uint256 public IR4 = 10;
+    uint256 public IR4 = 10; */
+    //Variable interest rate parameters, They are in basis points to facilitate calculations
+    uint256 slope1 = 1000;
+    uint256 slope2 = 6000;
+    uint256 BI1 = 500; // base interest
+    uint256 Uopt1 = 9000;
+    uint256 public totalLoans1;
+    uint256 BI2 = 500;
+    uint256 Uopt2 = 9000;
+    uint256 public totalLoans2;
+    uint256 BI3 = 500;
+    uint256 Uopt3 = 9000;
+    uint256 public totalLoans3;
+    uint256 BI4 = 500;
+    uint256 Uopt4 = 9000;
+    uint256 public totalLoans4;
    //Keeps tracks of the contract pending loans and balance values for each pool
     uint256 public contractValue1;
     uint256 public contractValue2;
@@ -99,18 +115,7 @@ and the address of the NFT token to accept */
             LT4 = _LT;
         }
     }
-    function setIR(uint256 _IR, uint256 _basket) external onlyRole(ADMIN_ROLE) {
-        require(_basket == 1 || _basket == 2 || _basket == 3 || _basket == 4, "Basket must be 1, 2, 3, or 4");
-        if (_basket == 1) {
-            IR1 = _IR;
-        } else if (_basket == 2) {
-            IR2 = _IR;
-        } else if (_basket == 3) {
-            IR3 = _IR;
-        } else {
-            IR4 = _IR;
-        }
-    }
+    
     function setdiscount(uint256 _discount, uint256 _basket) external onlyRole(ADMIN_ROLE) {
         require(_basket == 1 || _basket == 2 || _basket == 3 || _basket == 4, "Basket must be 1, 2, 3, or 4");
         if (_basket == 1) {
@@ -147,6 +152,11 @@ and the address of the NFT token to accept */
     function onERC721Received(address, address, uint256, bytes memory) public virtual returns (bytes4) {
         return this.onERC721Received.selector;
     }
+
+    /* This section contains functions that make calculations inside our
+    main functions, some are public calls that user can use to ckeck tha status 
+    of their loans */
+
     //Updates mappings for specific loans on borrow, repayment or liquidation
     function updateLoanBalance(address _borrower, uint256 _tokenID, uint256 _pendingLoan) internal {
         borrowAccounts[_borrower][_tokenID] = _pendingLoan;
@@ -154,6 +164,12 @@ and the address of the NFT token to accept */
     function updateLoanTime(address _borrower, uint256 _tokenID) internal {
         loanTime[_borrower][_tokenID] = block.timestamp;
     }
+    //UpdatesIR
+    function updateLoanIR(address _borrower, uint256 _tokenID, uint256 _basket) internal {
+        uint256 _IR = setIR(_basket); 
+        loanIR[_borrower][_tokenID] = _IR;
+    }
+    
     //We use these to send refunds
     function transferEth(address payable recipient, uint256 amount) internal {
         require(address(this).balance >= amount, "Insufficient contract balance");
@@ -185,30 +201,62 @@ and the address of the NFT token to accept */
     }
 
     //Sets variables according to basket in internal function calculations
-    function setVariables(uint256 _tokenID) internal view returns(uint256 _IR, uint256 _LT, uint256 _discount, uint256 _contractValue) {
+    function setVariables(uint256 _tokenID) internal view returns(uint256 _LT, uint256 _discount, uint256 _contractValue) {
         uint256 _basket = basketMapping[_tokenID];
         if (_basket == 1) {
-                _IR = IR1;
                 _LT = LT1;
                 _discount = discount1;
                 _contractValue = contractValue1;
         } else if (_basket == 2) {
-                _IR = IR2;
                 _LT = LT2;
                 _discount = discount2;
                 _contractValue = contractValue2;
         } else if (_basket == 3) {
-                _IR = IR3;
                 _LT = LT3;
                 _discount = discount3;
                 _contractValue = contractValue3;
         } else {
-                _IR = IR4;
                 _LT = LT4;
                 _discount = discount4;
                 _contractValue = contractValue4;
         }  
-        return (_IR, _LT, _discount, _contractValue);
+        return (_LT, _discount, _contractValue);
+    }
+
+    //Interest rate model function
+    function setIR(uint256 _basket) internal view returns(uint256) {
+        uint256 _IR;
+        if (_basket == 1) {
+            uint256 _utilizationRate = (totalLoans1 * 10000) / contractValue1; // calculates utilization
+            //if under Uopt slope1 else slope 2
+            if (_utilizationRate <= Uopt1) {
+                _IR = BI1 + ((_utilizationRate * slope1) / Uopt1);
+            } else {
+                _IR = BI1 + slope1 + (((_utilizationRate - Uopt1) * slope2) / (10000 - Uopt1));
+            }   
+        } else if (_basket == 2) {
+             uint256 _utilizationRate = (totalLoans2 * 10000) / contractValue2;
+            if (_utilizationRate <= Uopt2) {
+                _IR = BI2 + ((_utilizationRate * slope1) / Uopt2);
+            } else {
+                _IR = BI2 + slope1 + (((_utilizationRate - Uopt2) * slope2) / (10000 - Uopt2));
+            }   
+        } else if (_basket == 3) {
+             uint256 _utilizationRate = (totalLoans3 * 10000) / contractValue3;
+            if (_utilizationRate <= Uopt3) {
+                _IR = BI3 + ((_utilizationRate * slope1) / Uopt3);
+            } else {
+                _IR = BI3 + slope1 + (((_utilizationRate - Uopt3) * slope2) / (10000 - Uopt3));
+            }   
+        } else {
+          uint256 _utilizationRate = (totalLoans4 * 10000) / contractValue4;
+            if (_utilizationRate <= Uopt4) {
+                _IR = BI4 + ((_utilizationRate * slope1) / Uopt4);
+            } else {
+                _IR = BI4 + slope1 + (((_utilizationRate - Uopt4) * slope2) / (10000 - Uopt4));
+            }   
+        }
+        return _IR;
     }
     
     //Calls the stored value of a specific loan
@@ -218,6 +266,10 @@ and the address of the NFT token to accept */
     //Used to check starting times for interest rate calculations
     function checkTime(address _borrower, uint256 _tokenID) public view returns (uint256) {
         return loanTime[_borrower][_tokenID];
+    }
+    //Checks IR
+     function checkIR(address _borrower, uint256 _tokenID) public view returns (uint256) {
+        return loanIR[_borrower][_tokenID];
     }
     // We use this function to move in the NFT, it needs to be approved
     function transferINNFT(uint256 _tokenID) internal {
@@ -232,7 +284,7 @@ and the address of the NFT token to accept */
     //Calculates accrued interest
     function calculateAccruedInterest(uint256 _loanValue, uint256 _loanTime, uint256 _IR) internal view returns (uint256) {
     // Convert APR to a fixed-point decimal value with 18 decimal places
-        uint256 decimalApr = _IR * 10**18 / 100;
+        uint256 decimalApr = _IR * 10**18 / 10000;
     // Calculate the time difference in seconds
         uint256 timeDiff = block.timestamp - _loanTime;
     // Calculate the interest rate per second as a fixed-point decimal value
@@ -241,6 +293,7 @@ and the address of the NFT token to accept */
         uint256 accruedInterest = _loanValue * interestRatePerSecond * timeDiff / 10**18;
         return accruedInterest;
     }   
+
 
 // Deposit and withdraw function for liquidity providers
     
@@ -353,7 +406,7 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
         } else {
             _BC = BC4;
         }  
-
+    
     //controls the borrowed amount
       require((_borrowAmount / 1000000000000000000) <= ((_BC * _price)/ 10 ), "Amount to borrow is over the capacity");
     //TransfersNFTs and ETH
@@ -363,6 +416,18 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
      updateLoanBalance(_borrower, _tokenID, _borrowAmount);
     //sets loan time
      updateLoanTime(_borrower, _tokenID);
+    // sets IR
+     updateLoanIR(_borrower, _tokenID, _basket);
+    //Updates loans value
+    if (_basket == 1) {
+            totalLoans1 = totalLoans1 + _borrowAmount;
+         } else if (_basket == 2) {
+            totalLoans2 = totalLoans2 + _borrowAmount;
+         } else if (_basket == 3) {
+            totalLoans3 = totalLoans3 + _borrowAmount;
+         } else {
+            totalLoans4 = totalLoans4 + _borrowAmount;
+         } 
     //emits Event
       emit Loan(_borrower, _tokenID, _borrowAmount);
   }
@@ -388,22 +453,19 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
      //Check current loan
       _loanValue = checkLoan(_borrower,_tokenID);
       _loanTime = checkTime(_borrower,_tokenID);
+      _IR = checkIR(_borrower,_tokenID);
     // This will be done by setVariables() still to be implemented 
       _basket = basketMapping[_tokenID];
      if (_basket == 1) {
-            _IR = IR1;
             _contractValue = contractValue1;
             _BC = BC1;
         } else if (_basket == 2) {
-            _IR = IR2;
             _contractValue = contractValue2;
             _BC = BC2;
         } else if (_basket == 3) {
-            _IR = IR3;
             _contractValue = contractValue3;
             _BC = BC3;
         } else {
-            _IR = IR4;
             _contractValue = contractValue4;
             _BC = BC4;
         }  
@@ -419,15 +481,21 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
      updateLoanBalance(_borrower, _tokenID, _newBalance);
     //sets loan time
      updateLoanTime(_borrower, _tokenID);
+     updateLoanIR(_borrower, _tokenID, _basket);
+     
     //update contract value
      if (_contractValue == contractValue1) {
             contractValue1 = contractValue1 + _accruedInterest;
+            totalLoans1 = totalLoans1 + _borrowAmount + _accruedInterest;
          } else if (_contractValue == contractValue2) {
             contractValue2 = contractValue2 + _accruedInterest;
+            totalLoans2 = totalLoans2 + _borrowAmount + _accruedInterest;
          } else if (_contractValue == contractValue3) {
             contractValue3 = contractValue3 + _accruedInterest;
+            totalLoans3 = totalLoans3 + _borrowAmount + _accruedInterest;
          } else {
             contractValue4 = contractValue4 + _accruedInterest;
+            totalLoans4 = totalLoans4 + _borrowAmount + _accruedInterest;
          } 
     //emits Event
       emit Loan(_borrower, _tokenID, _borrowAmount);
@@ -450,19 +518,16 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
     //Check current loan
       _loanValue = checkLoan(_borrower,_tokenID);
       _loanTime = checkTime(_borrower,_tokenID);
+      _IR = checkIR(_borrower, _tokenID);
     // This will be done by setVariables() still to be implemented
       _basket = basketMapping[_tokenID];
      if (_basket == 1) {
-            _IR = IR1;
             _contractValue = contractValue1;
         } else if (_basket == 2) {
-            _IR = IR2;
             _contractValue = contractValue2;
         } else if (_basket == 3) {
-            _IR = IR3;
             _contractValue = contractValue3;
         } else {
-            _IR = IR4;
             _contractValue = contractValue4;
         }  
 //Calculates accrued interest
@@ -475,12 +540,16 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
         updateLoanTime(_borrower, _tokenID);
         if (_contractValue == contractValue1) {
                 contractValue1 = contractValue1 + _accruedInterest;
+                totalLoans1 = totalLoans1 - msg.value + _accruedInterest;
             } else if (_contractValue == contractValue2) {
                 contractValue2 = contractValue2 + _accruedInterest;
+                totalLoans2 = totalLoans2 - msg.value + _accruedInterest;
             } 
             else if (_contractValue == contractValue3) {
                 contractValue3 = contractValue3 + _accruedInterest;
+                totalLoans3 = totalLoans3 - msg.value + _accruedInterest;
             } else {
+                totalLoans4 = totalLoans4 - msg.value + _accruedInterest;
                 contractValue4 = contractValue4 + _accruedInterest;
             } 
     } else {
@@ -491,16 +560,18 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
         _pendingLoan = 0;
          if (_contractValue == contractValue1) {
             contractValue1 = contractValue1 + _accruedInterest;
+            totalLoans1 = totalLoans1 - _loanValue;
          } else if (_contractValue == contractValue2) {
             contractValue2 = contractValue2 + _accruedInterest;
+            totalLoans2 = totalLoans2 - _loanValue;
          } else if (_contractValue == contractValue3) {
             contractValue3 = contractValue3 + _accruedInterest;
+            totalLoans3 = totalLoans3 - _loanValue;
          } else {
             contractValue4 = contractValue4 + _accruedInterest;
+            totalLoans4 = totalLoans4 - _loanValue;
          } 
     }
-    //Update contract value
-    _contractValue = _contractValue + _accruedInterest;
     //emit event
     emit Repayment(_borrower, _tokenID, _pendingLoan);
     }
@@ -527,7 +598,8 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
       _loanValue = checkLoan(_borrower,_tokenID);
       _loanTime = checkTime(_borrower,_tokenID);
       _price = fetchPrice(_tokenID);
-     (_IR, _LT, _discount, _contractValue) = setVariables(_tokenID);
+      _IR = checkIR(_borrower,_tokenID);
+     (_LT, _discount, _contractValue) = setVariables(_tokenID);
     //Calculates accrued interest
      _accruedInterest = calculateAccruedInterest(_loanValue, _loanTime, _IR);
      _pendingAmount = _loanValue + _accruedInterest;
@@ -543,12 +615,16 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
     updateLoanBalance(_borrower, _tokenID, 0);
     if (_contractValue == contractValue1) {
         contractValue1 = contractValue1 + _discountedPrice - _loanValue;
+        totalLoans1 = totalLoans1 - _loanValue;
     } else if (_contractValue == contractValue2) {
         contractValue2 = contractValue2 + _discountedPrice - _loanValue;
+        totalLoans2 = totalLoans2 - _loanValue;
     } else if (_contractValue == contractValue3) {
-        contractValue3 = contractValue3 + _accruedInterest;
+        contractValue3 = contractValue3 + _discountedPrice - _loanValue;
+        totalLoans3 = totalLoans3 - _loanValue;
     } else {
-        contractValue4 = contractValue4 + _accruedInterest;
+        contractValue4 = contractValue4 + _discountedPrice - _loanValue;
+        totalLoans4 = totalLoans4 - _loanValue;
     } 
     //emit event
     emit Liquidation(_borrower, _tokenID);
