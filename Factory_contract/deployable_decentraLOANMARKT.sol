@@ -11,27 +11,28 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+   
 
 //Global variables
     mapping(address => mapping(uint256 => uint256)) public borrowAccounts; //Track loan accounts
     mapping(address => mapping(uint256 => uint256)) public loanTime; // keeps track of the loan timestamps
     mapping(address => mapping(uint256 => uint256)) public loanIR; // keeps track of a loan interest
-    uint256 immutable BC; //Here as integers but they are divided by 10 in the functions 3
-    uint256 immutable LT; // 7
-    uint256 immutable basket; // 1 to 4
+    uint256 public immutable BC; //Here as integers but they are divided by 10 in the functions 3
+    uint256 public immutable LT; // 7
+    uint256 public immutable discount; //9
+    uint256 public immutable basket; // 1 to 4
     //uint256 public IR = 10; //This one is in percentage
     //Variable interest rate parameters, They are in basis points to facilitate calculations
-    uint256 slope1 = 1000;
-    uint256 slope2 = 6000;
-    uint256 immutable BI; // base interest 500
-    uint256 immutable Uopt; //9000
+    uint256 public immutable slope1;// = 1000;
+    uint256 public immutable slope2;// = 6000;
+    uint256 public immutable BI; // base interest 500
+    uint256 public immutable Uopt; //9000
     uint256 public totalLoans;
-    uint256 immutable discount; //9
     uint256 public contractValue; //Keeps tracks of the contract pending loans and balance values
     address public immutable nftContract; //Should be set by the constructor to the NFT contract
     //The following are just for the mockup and testing
     //For testing in theory is sent by API
-    uint256 public price = 3;
+    uint256 public price = 3; // in Eth
     mapping(uint256 => uint256) public basketMapping; //keeps track of what basket was the NFT assigned, in reality should be sent by API
 
 //Events necessary for the contract
@@ -47,9 +48,11 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
         uint256 _Uopt,
         uint256 _discount,
         uint256 _BI,
+        uint256 _slope1,
+        uint256 _slope2,
         string memory _name,
         string memory _ticker
-    ) ERC20(_name, _ticker) ERC20Permit("LANDmarket") {
+    ) ERC20(_name, _ticker) ERC20Permit(_name) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, address(this)); // minter role probably has to be the contract address and not msg.sender
         nftContract = _nftContract; //Sets up address of the NFT in theory it should be decentraland's contracts
@@ -59,6 +62,8 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
         BI = _BI; // base interest 500
         Uopt = _Uopt; //9000
         discount = _discount; //9
+        slope1 = _slope1;
+        slope2 = _slope2;
     }
 
     function setPrice(uint256 _price) external {
