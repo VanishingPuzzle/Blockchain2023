@@ -18,18 +18,17 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     mapping(address => mapping(uint256 => uint256)) public loanIR; // keeps track of a loan interest
     uint256 public BC = 3; //Here as integers but they are divided by 10 in the functions
     uint256 public LT = 6;
-    //uint256 public IR = 10; //This one is in percentage
     //Variable interest rate parameters, They are in basis points to facilitate calculations
-    uint256 slope1 = 1000;
-    uint256 slope2 = 6000;
-    uint256 BI = 500; // base interest
-    uint256 Uopt = 9000;
+    uint256 public slope1 = 1000;
+    uint256 public slope2 = 6000;
+    uint256 public BI = 500; // base interest
+    uint256 public Uopt = 9000;
     uint256 public totalLoans;
     uint256 public discount = 9;
     uint256 public contractValue; //Keeps tracks of the contract pending loans and balance values
     address public immutable nftContract; //Should be set by the constructor to the NFT contract
     //The following are just for the mockup and testing
-    mapping(uint256 => uint256) public basketMapping;
+    //mapping(uint256 => uint256) public basketMapping;
     //For testing in theory is sent by API
     uint256 public price = 3;
 
@@ -53,14 +52,23 @@ contract LANDmarket is ERC20, ERC20Burnable, AccessControl, ERC20Permit {
     function setLT(uint256 _LT) external onlyRole(ADMIN_ROLE) {
             LT = _LT;
     }
-    //function setIR(uint256 _IR) external onlyRole(ADMIN_ROLE) {
-    //        IR = _IR;
-    //}
     function setdiscount(uint256 _discount) external onlyRole(ADMIN_ROLE) {
             discount = _discount;
     }
     function setPrice(uint256 _price) external {
             price = _price;
+    }
+    function setBI(uint256 _BI) external onlyRole(ADMIN_ROLE) {
+            BI = _BI;
+    }
+    function setUopt(uint256 _Uopt) external onlyRole(ADMIN_ROLE) {
+            Uopt = _Uopt;
+    }
+    function setSlope1(uint256 _slope1) external onlyRole(ADMIN_ROLE) {
+            slope1 = _slope1;
+    }
+    function setSlope2(uint256 _slope2) external onlyRole(ADMIN_ROLE) {
+            slope2 = _slope2;
     }
     //Changes Admin Role
     function setAdmin(address _newAdmin) external { 
