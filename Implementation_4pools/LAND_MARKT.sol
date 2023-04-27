@@ -44,19 +44,19 @@ contract LANDmarket is AccessControl {
     uint256 public IR3 = 10;
     uint256 public IR4 = 10; */
     //Variable interest rate parameters, They are in basis points to facilitate calculations
-    uint256 slope1 = 1000;
-    uint256 slope2 = 6000;
-    uint256 BI1 = 500; // base interest
-    uint256 Uopt1 = 9000;
+    uint256 public slope1 = 1000;
+    uint256 public slope2 = 6000;
+    uint256 public BI1 = 500; // base interest
+    uint256 public Uopt1 = 9000;
     uint256 public totalLoans1;
-    uint256 BI2 = 500;
-    uint256 Uopt2 = 9000;
+    uint256 public BI2 = 500;
+    uint256 public Uopt2 = 9000;
     uint256 public totalLoans2;
-    uint256 BI3 = 500;
-    uint256 Uopt3 = 9000;
+    uint256 public BI3 = 500;
+    uint256 public Uopt3 = 9000;
     uint256 public totalLoans3;
-    uint256 BI4 = 500;
-    uint256 Uopt4 = 9000;
+    uint256 public BI4 = 500;
+    uint256 public Uopt4 = 9000;
     uint256 public totalLoans4;
    //Keeps tracks of the contract pending loans and balance values for each pool
     uint256 public contractValue1;
@@ -127,6 +127,36 @@ and the address of the NFT token to accept */
         } else {
             discount4 = _discount;
         }
+    }
+    function setBI(uint256 _BI, uint256 _basket) external onlyRole(ADMIN_ROLE) {
+        require(_basket == 1 || _basket == 2 || _basket == 3 || _basket == 4, "Basket must be 1, 2, 3, or 4");
+        if (_basket == 1) {
+            BI1 = _BI;
+        } else if (_basket == 2) {
+            BI2 = _BI;
+        } else if (_basket == 3) {
+            BI3 = _BI;
+        } else {
+            BI4 = _BI;
+        }
+    }
+    function setUopt(uint256 _Uopt, uint256 _basket) external onlyRole(ADMIN_ROLE) {
+        require(_basket == 1 || _basket == 2 || _basket == 3 || _basket == 4, "Basket must be 1, 2, 3, or 4");
+        if (_basket == 1) {
+            Uopt1 = _Uopt;
+        } else if (_basket == 2) {
+            Uopt2 = _Uopt;
+        } else if (_basket == 3) {
+            Uopt3 = _Uopt;
+        } else {
+            Uopt4 = _Uopt;
+        }
+    }
+    function setSlope1(uint256 _slope1) external onlyRole(ADMIN_ROLE) {
+            slope1 = _slope1;
+    }
+    function setSlope2(uint256 _slope2) external onlyRole(ADMIN_ROLE) {
+            slope2 = _slope2;
     }
     function setPrice(uint256 _price, uint256 _basket) external onlyRole(ADMIN_ROLE) {
         require(_basket == 1 || _basket == 2 || _basket == 3 || _basket == 4, "Basket must be 1, 2, 3, or 4");
@@ -603,10 +633,10 @@ function withdraw(uint256 _amount, uint256 _poolNumber) external {
     //Calculates accrued interest
      _accruedInterest = calculateAccruedInterest(_loanValue, _loanTime, _IR);
      _pendingAmount = _loanValue + _accruedInterest;
-     _liquidationValue = (_price * _LT) * 1000000000000000000 / 10;
+     _liquidationValue = (_price * _LT) * 1000000000000000000 / 10; // * 1 eth should also work
     //Controls that the NFT can be liquidated
     require(_pendingAmount >= _liquidationValue, "The position is not unhealthy");
-    _discountedPrice = (_price * _discount) / 10 * 1 ether;  
+    _discountedPrice = (_price * _discount) * 1 ether / 10;  
     require(msg.value >= _discountedPrice, "Not enough ETH has been deposited to buy the LAND parcel"); //Controls that enough ETH was deposited to buy the NFT
     //transfer and settles loan liquidation
     _return = msg.value - _discountedPrice;
