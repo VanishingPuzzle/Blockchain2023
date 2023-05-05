@@ -3,7 +3,8 @@ EY: Decentraland
 
 **Welcome to the decentraLOAN repositoy**
 
-in this repository you can fin the descriptions for the implementations of the decentraloan protocol.
+in this repository you can find the descriptions for the implementations of the decentraloan protocol.
+Here is a description of what you can find on each folder:
 
 **Implementation 1 pool**
 In the final implemtation 1 pool folder the files for a single pool system are found. These are useful 
