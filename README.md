@@ -33,6 +33,8 @@ testing.
 **Pricing models**
 This folder contain an example on how the proposed classification algorithm could be implemented. It uses a Kaggle dataset.
 It can be expanded with more characteristics for valuation and security features.
+Uses a 4 basket based approach for pricing. It can be implemented in a way you can input coordinates(x,y) from where you can calucalate features and retrived price and basket
+
 
 **python scripts**
 Miscelaneus scripts used for plots and other minor applications in the concept paper, not necessary for grading.
