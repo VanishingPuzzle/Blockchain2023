@@ -36,3 +36,5 @@ It can be expanded with more characteristics for valuation and security features
 
 **python scripts**
 Miscelaneus scripts used for plots and other minor applications in the concept paper, not necessary for grading.
+
+Contains Mockup file with a clickable link
